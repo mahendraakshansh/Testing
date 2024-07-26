@@ -1,0 +1,25 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col,count
+
+spark = SparkSession.builder.appName('Credit card').master('local[*]')\
+.config('spark.jars','file:///home/hduser/LFS/Jars/redshift-jdbc42-2.1.0.29.jar').getOrCreate()
+
+empdf = spark.read.format('csv').option('header','true').option('delimiter',',').option('inferSchema','true').load('hdfs://localhost:54310/user/hduser/HFS/datasets/Input/emp.csv')
+
+deptdf = spark.read.format('jdbc')\
+.option('url','jdbc:mysql://saif-db-instnc.cdo7vhlkey3k.us-east-1.rds.amazonaws.com/akshansh_db?useSSL=False')\
+.option('driver','com.mysql.jdbc.Driver').option('user','admin')\
+.option('password','Welcome123')\
+.option('dbtable','dep')\
+.load()
+
+mergedf = empdf.join(deptdf,deptdf.deptno==empdf.deptid,"inner")
+filterdf = mergedf.filter(col('loc')=='CHICAGO')`
+
+filterdf.write.format('jdbc').mode('overwrite')\
+.option('url','jdbc:redshift://akshansh-cluster.cdj17lrr42z5.us-east-1.redshift.amazonaws.com:5439/akshansh_db')\
+.option('driver','com.amazon.redshift.jdbc42.Driver')\
+.option('user','awsuser')\
+.option('password','Welcome123')\
+.option('dbtable','chicago_emp')\
+.save()
